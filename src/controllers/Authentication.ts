@@ -12,7 +12,7 @@ import {
   AuthRequest 
 } from '../types/auth.types';
 
-export async function register(req: Request<{}, {}, RegisterRequest>, res: Response): Promise<void> {
+export async function register(req: Request<{}, {}, RegisterRequest>, res: Response) {
   try {
     const { email, password, firstName, lastName } = req.body;
 
@@ -56,7 +56,7 @@ export async function register(req: Request<{}, {}, RegisterRequest>, res: Respo
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'User registered successfully',
       accessToken,
       user: {
@@ -71,7 +71,7 @@ export async function register(req: Request<{}, {}, RegisterRequest>, res: Respo
     });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 

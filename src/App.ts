@@ -4,7 +4,7 @@ import compression from "compression";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { initDB } from "./db";
+// import { initDB } from "./db";
 import morgan from "morgan";
 import AppRoot from "./routes"
 
@@ -14,7 +14,7 @@ const app = express();
 const PORT = 5000;
 
 
-initDB()
+// initDB()
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 

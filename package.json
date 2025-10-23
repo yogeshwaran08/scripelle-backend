@@ -7,7 +7,6 @@
     "dev": "nodemon --watch src --exec ts-node src/App.ts",
     "build": "tsc",
     "start": "node dist/App.js",
-    "setup-db": "ts-node src/setup-db.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
