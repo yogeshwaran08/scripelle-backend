@@ -15,7 +15,7 @@
 # EXPOSE 5000
 # CMD npx prisma migrate deploy && npm start
 
-FROM node:18 AS builder
+FROM node:21 AS builder
 WORKDIR /app
 
 # Install dependencies
@@ -27,7 +27,7 @@ COPY . .
 RUN npm run build && npx prisma generate
 
 # --- Production Stage ---
-FROM node:18
+FROM node:21
 WORKDIR /app
 
 # --- Hardcoded Environment Variables ---
