@@ -28,7 +28,7 @@ ENV PGHOST=fo00oogswwco04gsg4ogc84g \
     JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-this-in-production-min-32-chars \
     JWT_EXPIRES_IN=15m \
     JWT_REFRESH_EXPIRES_IN=7d \
-    DATABASE_URL=postgres://postgres:aU6eYVklDNWLzEPdQnuHSBMgd50uAucHshJHvcBTL8xa2vm2stdp8BzaXIpCeBEH@145.223.19.168:5432/postgres?schema=public \
+    DATABASE_URL=postgres://postgres:aU6eYVklDNWLzEPdQnuHSBMgd50uAucHshJHvcBTL8xa2vm2stdp8BzaXIpCeBEH@145.223.19.168:5432/scripelle_db?schema=public \
     GEMINI_API_KEY=AIzaSyCVHCCv2a35-LdeCzulMc4VBw4CsOB36A0
 
 # Install production dependencies

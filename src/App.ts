@@ -13,8 +13,6 @@ dotenv.config();
 const app = express();
 const PORT = 5000;
 
-
-// initDB()
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -29,7 +27,6 @@ if (process.env.NODE_ENV === 'development') {
 } else {
   app.use(morgan('combined'));
 }
-
 
 app.use(
   cors({
