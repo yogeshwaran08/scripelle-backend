@@ -33,7 +33,7 @@ if (process.env.NODE_ENV === 'development') {
 
 app.use(
   cors({
-    origin: ["http://localhost:5174"],
+    origin: ["http://localhost:5174", "https://early-access.scripelle.com"],
     credentials: true,
     methods: "GET,POST,PUT,DELETE,OPTIONS",
     allowedHeaders: "Content-Type,Authorization",
