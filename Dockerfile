@@ -1,20 +1,4 @@
-# FROM node:18 AS builder
-# WORKDIR /app
-# COPY package*.json ./
-# RUN npm install
-# COPY . .
-# RUN npm run build && npx prisma generate
-
-# FROM node:18
-# WORKDIR /app
-# COPY package*.json ./
-# RUN npm install --omit=dev
-# COPY --from=builder /app/dist ./dist
-# COPY --from=builder /app/prisma ./prisma
-
-# EXPOSE 5000
-# CMD npx prisma migrate deploy && npm start
-
+# ---------- BUILD STAGE ----------
 FROM node:21 AS builder
 WORKDIR /app
 
@@ -24,13 +8,17 @@ RUN npm install
 
 # Copy source and build
 COPY . .
-RUN npm run build && npx prisma generate
+RUN npm run build
 
-# --- Production Stage ---
+# Generate Prisma client (must happen AFTER schema copy)
+RUN npx prisma generate
+
+
+# ---------- PRODUCTION STAGE ----------
 FROM node:21
 WORKDIR /app
 
-# --- Hardcoded Environment Variables ---
+# Environment variables
 ENV PGHOST=fo00oogswwco04gsg4ogc84g \
     PGPORT=5432 \
     PGUSER=postgres \
@@ -41,7 +29,7 @@ ENV PGHOST=fo00oogswwco04gsg4ogc84g \
     PGPOOL_CONNECTION_TIMEOUT_MS=0 \
     PGSSLMODE=disable \
     PGDEBUG=false \
-    NODE_ENV=development \
+    NODE_ENV=production \
     JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-min-32-chars \
     JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-this-in-production-min-32-chars \
     JWT_EXPIRES_IN=15m \
@@ -49,16 +37,16 @@ ENV PGHOST=fo00oogswwco04gsg4ogc84g \
     DATABASE_URL=postgres://postgres:aU6eYVklDNWLzEPdQnuHSBMgd50uAucHshJHvcBTL8xa2vm2stdp8BzaXIpCeBEH@145.223.19.168:5432/postgres?schema=public \
     GEMINI_API_KEY=AIzaSyCVHCCv2a35-LdeCzulMc4VBw4CsOB36A0
 
-# --- Install production dependencies ---
+# Install production dependencies
 COPY package*.json ./
 RUN npm install --omit=dev
 
-# Copy build and prisma schema
+# Copy built app, prisma schema, and generated client
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Expose app port
 EXPOSE 5000
 
-# --- Run migrations and start server ---
+# Run migrations and start server
 CMD npx prisma migrate deploy && npm start
