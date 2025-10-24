@@ -1,24 +1,18 @@
-# ---------- BUILD STAGE ----------
 FROM node:21 AS builder
 WORKDIR /app
 
-# Install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy source and build
 COPY . .
 RUN npm run build
 
-# Generate Prisma client (must happen AFTER schema copy)
 RUN npx prisma generate
 
 
-# ---------- PRODUCTION STAGE ----------
 FROM node:21
 WORKDIR /app
 
-# Environment variables
 ENV PGHOST=fo00oogswwco04gsg4ogc84g \
     PGPORT=5432 \
     PGUSER=postgres \
