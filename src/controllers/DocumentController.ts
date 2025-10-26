@@ -1,35 +1,36 @@
-import { Request, Response } from "express";
 import { catchAsync, sendResponse, throwError, error_codes } from "../utils/httpWrapper";
 import { prisma } from "../db/prisma";
+import { AuthRequest } from "../types/auth.types";
 
-/**
- * Create a new document
- * POST /documents
- */
-export const createDocument = catchAsync(async (req, res) => {
+export const createDocument = catchAsync(async (req: AuthRequest, res) => {
     const { title, content = "", chatHistory = [] } = req.body;
     
     if (!title) {
         throw throwError("Title is required", error_codes.BAD_REQUEST);
     }
 
+    const userId = req.user?.userId;
+
     const document = await prisma.documents.create({
         data: {
             title,
             content,
-            chatHistory: Array.isArray(chatHistory) ? chatHistory : []
+            chatHistory: Array.isArray(chatHistory) ? chatHistory : [],
+            createdBy: userId || null 
         }
     });
 
     return sendResponse(res, document, { message: "Document created successfully" });
 });
 
-/**
- * Get all documents
- * GET /documents
- */
-export const getAllDocuments = catchAsync(async (req, res) => {
+
+export const getAllDocuments = catchAsync(async (req: AuthRequest, res) => {
+    const userId = req.user?.userId;
+    
     const documents = await prisma.documents.findMany({
+        where: userId ? {
+            createdBy: userId
+        } : undefined,
         orderBy: {
             updatedAt: 'desc'
         }
@@ -41,17 +42,13 @@ export const getAllDocuments = catchAsync(async (req, res) => {
     });
 });
 
-/**
- * Get a single document by ID
- * GET /documents/:id
- */
-export const getDocumentById = catchAsync(async (req, res) => {
+export const getDocumentById = catchAsync(async (req: AuthRequest, res) => {
     const { id } = req.params;
 
     const document = await prisma.documents.findUnique({
         where: {
             id: parseInt(id)
-        }
+        },
     });
 
     if (!document) {
@@ -61,11 +58,7 @@ export const getDocumentById = catchAsync(async (req, res) => {
     return sendResponse(res, document, { message: "Document retrieved successfully" });
 });
 
-/**
- * Update a document
- * PUT /documents/:id
- */
-export const updateDocument = catchAsync(async (req, res) => {
+export const updateDocument = catchAsync(async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { title, content, chatHistory } = req.body;
 
@@ -91,11 +84,7 @@ export const updateDocument = catchAsync(async (req, res) => {
     return sendResponse(res, document, { message: "Document updated successfully" });
 });
 
-/**
- * Delete a document
- * DELETE /documents/:id
- */
-export const deleteDocument = catchAsync(async (req, res) => {
+export const deleteDocument = catchAsync(async (req: AuthRequest, res) => {
     const { id } = req.params;
 
     const existingDocument = await prisma.documents.findUnique({

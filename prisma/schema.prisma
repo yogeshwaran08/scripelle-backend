@@ -21,6 +21,8 @@ model User {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
+  documents Documents[]
+
   @@map("users")
 }
 
@@ -29,8 +31,12 @@ model Documents {
   title       String
   content     String   @db.Text
   chatHistory String[] @map("chat_history")
+  createdBy   Int?     @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relation to user
+  user User? @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@map("documents")
 }

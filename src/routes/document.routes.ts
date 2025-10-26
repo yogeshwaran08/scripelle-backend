@@ -6,17 +6,18 @@ import {
     updateDocument,
     deleteDocument 
 } from '../controllers/DocumentController';
+import { authenticateToken } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-router.post('/', createDocument);
+router.post('/', authenticateToken, createDocument);
 
-router.get('/', getAllDocuments);
+router.get('/', authenticateToken, getAllDocuments);
 
-router.get('/:id', getDocumentById);
+router.get('/:id', authenticateToken, getDocumentById);
 
-router.put('/:id', updateDocument);
+router.put('/:id', authenticateToken, updateDocument);
 
-router.delete('/:id', deleteDocument);
+router.delete('/:id', authenticateToken, deleteDocument);
 
 export default router;
