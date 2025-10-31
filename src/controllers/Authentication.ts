@@ -12,7 +12,7 @@ import {
   AuthRequest 
 } from '../types/auth.types';
 import { catchAsync } from '../utils/httpWrapper';
-import customPassport from '../utils/passport';
+import passport from '../utils/passport';
 
 export async function register(req: Request<{}, {}, RegisterRequest>, res: Response) {
   try {
@@ -264,7 +264,7 @@ export async function getCurrentUser(req: AuthRequest, res: Response): Promise<v
 
 
 export const googleSignin = catchAsync(async (req, res) => {
-  customPassport.authenticate("google", { scope: ["profile", "email"] })(req, res);
+  passport.authenticate("google", { scope: ["profile", "email"] })(req, res);
 });
 
 export async function googleCallbackHandler(req: Request, res: Response) {

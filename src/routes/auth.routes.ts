@@ -9,8 +9,7 @@ import {
   googleCallbackHandler,
 } from '../controllers/Authentication';
 import { authenticateToken } from '../middlewares/auth.middleware';
-import passport from 'passport';
-import customPassport from '../utils/passport';
+import passport from '../utils/passport';
 
 const router = Router();
 
@@ -26,7 +25,7 @@ router.get(
 
 router.get(
   "/google/callback",
-  customPassport.authenticate("google", { session: false }),
+  passport.authenticate("google", { session: false }),
   googleCallbackHandler
 );
 router.get('/me', authenticateToken, getCurrentUser);

@@ -8,8 +8,8 @@ import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import AppRoot from "./routes"
 import session from "express-session";
-import "./config/passport";
-import customPassport from "./utils/passport";
+// import "./config/passport";
+import passport from "./utils/passport";
 
 dotenv.config();
 
@@ -54,8 +54,8 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(helmet());
 app.use(compression());
-app.use(customPassport.initialize());
-app.use(customPassport.session());
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use("/api/v1", AppRoot);
 

@@ -12,6 +12,7 @@ passport.use(
       callbackURL: process.env.SERVER_URL + "/api/v1/auth/google/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
+      console.log("process", process.env.SERVER_URL)
       try {
         const email = profile.emails?.[0]?.value;
         const firstName = profile.name?.givenName || "";
