@@ -31,7 +31,7 @@ ENV PGHOST=fo00oogswwco04gsg4ogc84g \
     DATABASE_URL=postgres://postgres:aU6eYVklDNWLzEPdQnuHSBMgd50uAucHshJHvcBTL8xa2vm2stdp8BzaXIpCeBEH@145.223.19.168:5432/scripelle_db?schema=public \
     GEMINI_API_KEY=AIzaSyCVHCCv2a35-LdeCzulMc4VBw4CsOB36A0 \
     CLIENT_URL=https://early-access.scripelle.com \
-    GOOGLE_CLIENT_ID=k0o019cdedlk60u30i845njfv9up6o0c \
+    GOOGLE_CLIENT_ID=80037841697-k0o019cdedlk60u30i845njfv9up6o0c.apps.googleusercontent.com \
     GOOGLE_CLIENT_SECRET=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 \
     SESSION_SECRET=uoQHtyEfr2FwcW879A8sTFMyztyzqM8L3DoWRm14rWmL0e217tYRdcNBXuZnaqbR
 
