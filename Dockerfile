@@ -24,12 +24,17 @@ ENV PGHOST=fo00oogswwco04gsg4ogc84g \
     PGSSLMODE=disable \
     PGDEBUG=false \
     NODE_ENV=production \
-    JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-min-32-chars \
-    JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-this-in-production-min-32-chars \
+    JWT_SECRET=uoQHtyEfr2FwcW879A8sTFMyztyzqM8L3DoWRm14rWmL0e217tYRdcNBXuZnaqbR \
+    JWT_REFRESH_SECRET=uoQHtyEfr2FwcW879A8sTFMyztyzqM8L3DoWRm14rWmL0e217tYRdcNBXuZnaqbR \
     JWT_EXPIRES_IN=15m \
     JWT_REFRESH_EXPIRES_IN=7d \
     DATABASE_URL=postgres://postgres:aU6eYVklDNWLzEPdQnuHSBMgd50uAucHshJHvcBTL8xa2vm2stdp8BzaXIpCeBEH@145.223.19.168:5432/scripelle_db?schema=public \
-    GEMINI_API_KEY=AIzaSyCVHCCv2a35-LdeCzulMc4VBw4CsOB36A0
+    GEMINI_API_KEY=AIzaSyCVHCCv2a35-LdeCzulMc4VBw4CsOB36A0 \
+    CLIENT_URL=https://early-access.scripelle.com \
+    GOOGLE_CLIENT_ID=k0o019cdedlk60u30i845njfv9up6o0c \
+    GOOGLE_CLIENT_SECRET=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 \
+    SESSION_SECRET=uoQHtyEfr2FwcW879A8sTFMyztyzqM8L3DoWRm14rWmL0e217tYRdcNBXuZnaqbR
+
 
 # Install production dependencies
 COPY package*.json ./
