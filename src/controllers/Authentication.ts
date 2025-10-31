@@ -11,6 +11,8 @@ import {
   LoginRequest,
   AuthRequest 
 } from '../types/auth.types';
+import { catchAsync } from '../utils/httpWrapper';
+import customPassport from '../utils/passport';
 
 export async function register(req: Request<{}, {}, RegisterRequest>, res: Response) {
   try {
@@ -94,7 +96,7 @@ export async function login(req: Request<{}, {}, LoginRequest>, res: Response): 
       return;
     }
 
-    const isPasswordValid = await comparePassword(password, user.password);
+    const isPasswordValid = await comparePassword(password, user.password || "");
 
     if (!isPasswordValid) {
       res.status(401).json({ error: 'Invalid credentials' });
@@ -225,7 +227,6 @@ export async function getCurrentUser(req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    // Fetch full user details
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
       select: {
@@ -258,5 +259,33 @@ export async function getCurrentUser(req: AuthRequest, res: Response): Promise<v
   } catch (error) {
     console.error('Get current user error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+
+export const googleSignin = catchAsync(async (req, res) => {
+  customPassport.authenticate("google", { scope: ["profile", "email"] })(req, res);
+});
+
+export async function googleCallbackHandler(req: Request, res: Response) {
+  try {
+    const user = req.user as any;
+    if (!user) {
+      return res.redirect(`${process.env.CLIENT_URL}/login?error=OAuthFailed`);
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user.id, user.email);
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.redirect(`${process.env.CLIENT_URL}/oauth-success?token=${accessToken}`);
+  } catch (error) {
+    console.error("Google OAuth callback error:", error);
+    return res.redirect(`${process.env.CLIENT_URL}/login?error=OAuthInternalError`);
   }
 }

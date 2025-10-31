@@ -47,5 +47,5 @@ export interface RefreshTokenPayload {
 }
 
 export interface AuthRequest extends Request {
-  user?: TokenPayload;
+  user?: any;
 }

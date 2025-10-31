@@ -7,6 +7,9 @@ import cookieParser from "cookie-parser";
 // import { initDB } from "./db";
 import morgan from "morgan";
 import AppRoot from "./routes"
+import session from "express-session";
+import "./config/passport";
+import customPassport from "./utils/passport";
 
 dotenv.config();
 
@@ -38,11 +41,21 @@ app.use(
   })
 );
 
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "supersecret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false }, 
+  })
+);
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(helmet());
 app.use(compression());
-
+app.use(customPassport.initialize());
+app.use(customPassport.session());
 
 app.use("/api/v1", AppRoot);
 
