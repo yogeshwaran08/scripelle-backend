@@ -33,8 +33,8 @@ ENV PGHOST=fo00oogswwco04gsg4ogc84g \
     CLIENT_URL=https://early-access.scripelle.com \
     GOOGLE_CLIENT_ID=80037841697-k0o019cdedlk60u30i845njfv9up6o0c.apps.googleusercontent.com \
     GOOGLE_CLIENT_SECRET=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 \
-    SESSION_SECRET=uoQHtyEfr2FwcW879A8sTFMyztyzqM8L3DoWRm14rWmL0e217tYRdcNBXuZnaqbR
-
+    SESSION_SECRET=uoQHtyEfr2FwcW879A8sTFMyztyzqM8L3DoWRm14rWmL0e217tYRdcNBXuZnaqbR \
+    SERVER_URL=https://backend.scripelle.com
 
 # Install production dependencies
 COPY package*.json ./
