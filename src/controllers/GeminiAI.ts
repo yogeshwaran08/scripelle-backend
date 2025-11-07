@@ -37,10 +37,7 @@ export async function generate(req: Request, res: Response): Promise<void> {
   }
 }
 
-/**
- * Generate AI content with streaming
- * POST /ai/generate-stream
- */
+
 export async function generateStream(req: Request, res: Response): Promise<void> {
   try {
     const { prompt, model } = req.body;

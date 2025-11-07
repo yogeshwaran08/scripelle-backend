@@ -4,11 +4,9 @@ import compression from "compression";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-// import { initDB } from "./db";
 import morgan from "morgan";
 import AppRoot from "./routes"
 import session from "express-session";
-// import "./config/passport";
 import passport from "./utils/passport";
 
 dotenv.config();
@@ -33,7 +31,7 @@ if (process.env.NODE_ENV === 'development') {
 
 app.use(
   cors({
-    origin: ["http://localhost:5174", "https://early-access.scripelle.com"],
+    origin: ["http://localhost:5174", "https://early-access.scripelle.com", "http://localhost:5175"],
     credentials: true,
     methods: "GET,POST,PUT,DELETE,OPTIONS",
     allowedHeaders: "Content-Type,Authorization",
@@ -46,7 +44,7 @@ app.use(
     secret: process.env.SESSION_SECRET || "supersecret",
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }, 
+    cookie: { secure: false },
   })
 );
 
