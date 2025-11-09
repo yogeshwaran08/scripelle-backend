@@ -11,16 +11,18 @@ datasource db {
 }
 
 model User {
-  id               Int      @id @default(autoincrement())
-  email            String   @unique
+  id               Int       @id @default(autoincrement())
+  email            String    @unique
   password         String?
-  firstName        String   @map("first_name")
-  lastName         String   @map("last_name")
-  plan             String   @default("free")
-  availableCredits Int      @default(0) @map("available_credits")
-  googleId         String?  @unique
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  firstName        String    @map("first_name")
+  lastName         String    @map("last_name")
+  plan             String    @default("free")
+  availableCredits Int       @default(0) @map("available_credits")
+  googleId         String?   @unique
+  resetToken       String?   @map("reset_token")
+  resetTokenExpiry DateTime? @map("reset_token_expiry")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   documents Documents[]
 
@@ -36,7 +38,6 @@ model Documents {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  // Relation to user
   user User? @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@map("documents")

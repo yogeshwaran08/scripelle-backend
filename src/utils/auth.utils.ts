@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import crypto from 'crypto';
 import { TokenPayload, RefreshTokenPayload } from '../types/auth.types';
 import { PrismaClient } from "@prisma/client";
 
@@ -7,7 +8,7 @@ const prisma = new PrismaClient();
 
 const JWT_SECRET: string = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production';
-const JWT_EXPIRES_IN: string | number = process.env.JWT_EXPIRES_IN || '15m'; 
+const JWT_EXPIRES_IN: string | number = process.env.JWT_EXPIRES_IN || '15m';
 const JWT_REFRESH_EXPIRES_IN: string | number = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 /**
@@ -73,9 +74,33 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
 export function generateTokens(userId: number, email: string) {
   const accessToken = generateAccessToken({ userId, email });
   const refreshToken = generateRefreshToken({ userId, email });
-  
+
   return {
     accessToken,
     refreshToken,
   };
+}
+
+/**
+ * Generate a secure reset token
+ */
+export function generateResetToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * Generate reset token expiry (1 hour from now)
+ */
+export function generateResetTokenExpiry(): Date {
+  const expiry = new Date();
+  expiry.setHours(expiry.getHours() + 1); // 1 hour from now
+  return expiry;
+}
+
+/**
+ * Check if reset token is valid (not expired)
+ */
+export function isResetTokenValid(expiry: Date | null): boolean {
+  if (!expiry) return false;
+  return new Date() < expiry;
 }

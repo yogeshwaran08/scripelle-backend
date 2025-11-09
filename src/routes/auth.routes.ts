@@ -7,6 +7,8 @@ import {
   getCurrentUser,
   googleSignin,
   googleCallbackHandler,
+  forgotPassword,
+  resetPassword,
 } from '../controllers/Authentication';
 import { authenticateToken } from '../middlewares/auth.middleware';
 import passport from '../utils/passport';
@@ -17,6 +19,8 @@ router.post('/register', register);
 router.post('/login', login);
 router.post('/refresh', refreshToken);
 router.post('/logout', logout);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 router.get(
   "/google",
