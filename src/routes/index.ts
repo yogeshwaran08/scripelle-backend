@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { pingPong } from "../controllers/tester";
 import authRoutes from "./auth.routes";
-import { generateText } from "../controllers/Generator";
 import AIRoutes from "./ai.routes";
 import documentRoutes from "./document.routes";
 import autocompletionRoutes from "./autocompletion.routes";
