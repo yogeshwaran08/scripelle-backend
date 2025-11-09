@@ -1,9 +1,12 @@
 import { Router } from "express";
-import { generateText } from "../controllers/Generator";
+import { generateText, getDocumentChatHistory, clearDocumentChatHistory } from "../controllers/Generator";
+import { authenticateToken } from "../middlewares/auth.middleware";
 
-const routes = Router() ;
+const routes = Router();
 
-//@ts-ignore
-routes.post("/generate-text", generateText);
+// Protected endpoints - require authentication
+routes.post("/generate-text", authenticateToken, generateText);
+routes.get("/document-chat-history/:documentId", authenticateToken, getDocumentChatHistory);
+routes.delete("/document-chat-history/:documentId", authenticateToken, clearDocumentChatHistory);
 
 export default routes;

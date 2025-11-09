@@ -4,7 +4,7 @@ import { AuthRequest } from "../types/auth.types";
 
 export const createDocument = catchAsync(async (req: AuthRequest, res) => {
     const { title, content = "", chatHistory = [] } = req.body;
-    
+
     if (!title) {
         throw throwError("Title is required", error_codes.BAD_REQUEST);
     }
@@ -16,7 +16,7 @@ export const createDocument = catchAsync(async (req: AuthRequest, res) => {
             title,
             content,
             chatHistory: Array.isArray(chatHistory) ? chatHistory : [],
-            createdBy: userId || null 
+            createdBy: userId || null
         }
     });
 
@@ -26,7 +26,7 @@ export const createDocument = catchAsync(async (req: AuthRequest, res) => {
 
 export const getAllDocuments = catchAsync(async (req: AuthRequest, res) => {
     const userId = req.user?.userId;
-    
+
     const documents = await prisma.documents.findMany({
         where: userId ? {
             createdBy: userId
@@ -36,9 +36,9 @@ export const getAllDocuments = catchAsync(async (req: AuthRequest, res) => {
         }
     });
 
-    return sendResponse(res, documents, { 
+    return sendResponse(res, documents, {
         message: "Documents retrieved successfully",
-        count: documents.length 
+        count: documents.length
     });
 });
 
@@ -61,7 +61,7 @@ export const getDocumentById = catchAsync(async (req: AuthRequest, res) => {
 export const updateDocument = catchAsync(async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { title, content, chatHistory } = req.body;
-
+    `   `
     const existingDocument = await prisma.documents.findUnique({
         where: { id: parseInt(id) }
     });

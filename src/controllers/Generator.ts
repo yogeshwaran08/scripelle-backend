@@ -1,21 +1,77 @@
 import { NextFunction, Request, Response } from "express";
 import { AuthRequest } from "../types/auth.types";
 import { genAI } from "../initializers";
+import prisma from "../db/prisma";
+
+async function verifyDocumentOwnership(documentId: string, userId: number) {
+  const document = await prisma.documents.findUnique({
+    where: {
+      id: parseInt(documentId),
+      createdBy: userId
+    }
+  });
+
+  if (!document) {
+    throw new Error('Document not found or access denied');
+  }
+
+  return document;
+}
+
+async function updateDocumentChatHistory(documentId: string, userMessage: string, aiResponse: string, currentHistory: string[] = []) {
+  const updatedChatHistory = [
+    ...currentHistory,
+    `User: ${userMessage}`,
+    `AI: ${aiResponse}`
+  ];
+
+  await prisma.documents.update({
+    where: { id: parseInt(documentId) },
+    data: {
+      chatHistory: updatedChatHistory,
+      updatedAt: new Date()
+    }
+  });
+
+  return updatedChatHistory;
+}
 
 export const generateText = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { prompt, context = "", maxTokens = 500, chatHistory = [], mode = "auto" } = req.body;
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const {
+      prompt,
+      context = "",
+      maxTokens = 500,
+      chatHistory = [],
+      mode = "auto",
+      documentId
+    } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    // Validate mode
     const validModes = ["agent", "ask", "auto"];
     if (!validModes.includes(mode)) {
       return res.status(400).json({
         error: "Invalid mode. Must be one of: agent, ask, auto"
       });
+    }
+
+    let document = null;
+    let documentChatHistory: string[] = [];
+
+    if (documentId) {
+      try {
+        document = await verifyDocumentOwnership(documentId, req.user.userId);
+        documentChatHistory = document.chatHistory || [];
+      } catch (error: any) {
+        return res.status(404).json({ error: error.message });
+      }
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
@@ -51,11 +107,31 @@ export const generateText = async (req: AuthRequest, res: Response, next: NextFu
       fullPrompt += `Context: ${context}\n`;
     }
 
-    if (chatHistory.length > 0) {
-      fullPrompt +=
-        "Chat History:\n" +
-        chatHistory.map((msg: any) => `${msg.role}: ${msg.content}`).join("\n") +
-        "\n";
+    // Add document title as context if available and meaningful
+    if (document && document.title &&
+      document.title.trim() !== '' &&
+      document.title.toLowerCase() !== 'untitled document' &&
+      document.title.toLowerCase() !== 'untitled') {
+      fullPrompt += `Document Title: ${document.title}\n`;
+    }
+
+    const effectiveChatHistory = document ? documentChatHistory : chatHistory;
+
+    if (effectiveChatHistory.length > 0) {
+      fullPrompt += "Chat History:\n";
+
+      if (typeof effectiveChatHistory[0] === 'string') {
+        effectiveChatHistory.forEach((message: string, index: number) => {
+          const role = index % 2 === 0 ? 'User' : 'Assistant';
+          fullPrompt += `${role}: ${message}\n`;
+        });
+      } else {
+        effectiveChatHistory.forEach((msg: any) => {
+          fullPrompt += `${msg.role || 'User'}: ${msg.content || msg}\n`;
+        });
+      }
+
+      fullPrompt += "\n";
     }
 
     fullPrompt += `Request: ${prompt}`;
@@ -73,17 +149,48 @@ export const generateText = async (req: AuthRequest, res: Response, next: NextFu
     });
 
     let text = result.response.text();
+    let shouldInsert = false;
+    let detectedIntent = mode;
 
-    // Post-process for agent mode to ensure clean output
     if (mode === "agent") {
       text = cleanAgentResponse(text);
+      shouldInsert = true;
+    } else if (mode === "auto") {
+      const isContentGeneration = detectContentGenerationIntent(prompt);
+
+      if (isContentGeneration) {
+        text = cleanAgentResponse(text);
+        shouldInsert = true;
+        detectedIntent = "agent";
+      } else {
+        shouldInsert = false;
+        detectedIntent = "ask";
+      }
+    }
+
+    // If document was provided, update its chat history
+    let chatHistoryLength = null;
+    if (document) {
+      const updatedChatHistory = await updateDocumentChatHistory(
+        documentId,
+        prompt,
+        text,
+        document.chatHistory || []
+      );
+      chatHistoryLength = updatedChatHistory.length;
     }
 
     return res.status(200).json({
       success: true,
       text,
       model: "gemini-2.0-flash-exp",
-      mode: mode
+      mode: mode,
+      shouldInsert: shouldInsert,
+      detectedIntent: detectedIntent,
+      userId: req.user.userId,
+      documentId: documentId || null,
+      documentTitle: document?.title || null,
+      chatHistoryLength
     });
   } catch (error: any) {
     console.error("Error generating text:", error);
@@ -94,7 +201,6 @@ export const generateText = async (req: AuthRequest, res: Response, next: NextFu
       });
     }
 
-    // Handle quota exceeded gracefully
     if (error.status === 429 || error.message?.includes('quota')) {
       return res.status(429).json({
         error: "API quota exceeded. Please try again later.",
@@ -109,11 +215,7 @@ export const generateText = async (req: AuthRequest, res: Response, next: NextFu
   }
 };
 
-/**
- * Clean agent response to remove any explanatory text or introductions
- */
 function cleanAgentResponse(text: string): string {
-  // Remove common AI response prefixes
   const prefixesToRemove = [
     /^(Here is|Here's|Here are)\s+/i,
     /^(The answer is|The response is|The text is)\s*:?\s*/i,
@@ -126,12 +228,10 @@ function cleanAgentResponse(text: string): string {
 
   let cleanText = text.trim();
 
-  // Remove prefixes
   for (const prefix of prefixesToRemove) {
     cleanText = cleanText.replace(prefix, '');
   }
 
-  // Remove common suffixes that add commentary
   const suffixesToRemove = [
     /\s+(Hope this helps!?|Let me know if you need.*|Feel free to.*|Is there anything else.*)\s*$/i,
     /\s+(I hope this is what you were looking for.*|Does this meet your needs.*)\s*$/i
@@ -141,8 +241,143 @@ function cleanAgentResponse(text: string): string {
     cleanText = cleanText.replace(suffix, '');
   }
 
-  // Remove excessive newlines but preserve intentional formatting
   cleanText = cleanText.replace(/\n\n\n+/g, '\n\n');
 
   return cleanText.trim();
 }
+
+function detectContentGenerationIntent(prompt: string): boolean {
+  const lowerPrompt = prompt.toLowerCase().trim();
+
+  const contentGenerationIndicators = [
+    'write', 'create', 'generate', 'compose', 'draft', 'make', 'build',
+    'design', 'develop', 'craft', 'produce', 'formulate',
+
+    'paragraph', 'sentence', 'story', 'article', 'essay', 'letter', 'email',
+    'report', 'summary', 'description', 'content', 'text', 'copy',
+    'introduction', 'conclusion', 'heading', 'title', 'subject line',
+    'bullet points', 'list', 'outline', 'script', 'dialogue',
+
+    'give me a', 'provide a', 'show me a', 'come up with',
+    'help me write', 'help me create', 'i need a', 'i want a'
+  ];
+
+  const questionIndicators = [
+    'what', 'how', 'why', 'when', 'where', 'who', 'which', 'whose',
+
+    'can you explain', 'what is', 'what are', 'how do', 'how does',
+    'why do', 'why does', 'when should', 'where can', 'who is',
+    'is it', 'are there', 'do you', 'does it', 'will it', 'would it',
+    'should i', 'could you', 'tell me about', 'explain'
+  ];
+
+  const hasContentGeneration = contentGenerationIndicators.some(indicator =>
+    lowerPrompt.includes(indicator)
+  );
+
+  const hasQuestionPattern = questionIndicators.some(indicator =>
+    lowerPrompt.includes(indicator)
+  );
+
+  const endsWithQuestionMark = lowerPrompt.endsWith('?');
+
+  if (hasContentGeneration && !endsWithQuestionMark) {
+    return true;
+  }
+
+  if (hasQuestionPattern || endsWithQuestionMark) {
+    return false;
+  }
+
+  if (lowerPrompt.length < 50 && hasContentGeneration) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Get document chat history - requires authentication and document ownership
+ * GET /ai/document-chat-history/:documentId
+ */
+export const getDocumentChatHistory = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { documentId } = req.params;
+
+    if (!documentId) {
+      return res.status(400).json({ error: 'Document ID is required' });
+    }
+
+    // Verify document belongs to the user
+    try {
+      const document = await verifyDocumentOwnership(documentId, req.user.userId);
+
+      return res.status(200).json({
+        success: true,
+        documentId,
+        documentTitle: document.title,
+        chatHistory: document.chatHistory || [],
+        chatHistoryLength: document.chatHistory?.length || 0,
+        lastUpdated: document.updatedAt
+      });
+    } catch (error: any) {
+      return res.status(404).json({ error: error.message });
+    }
+  } catch (error: any) {
+    console.error('Get document chat history error:', error);
+    return res.status(500).json({
+      error: 'Failed to get document chat history',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Clear document chat history - requires authentication and document ownership
+ * DELETE /ai/document-chat-history/:documentId
+ */
+export const clearDocumentChatHistory = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { documentId } = req.params;
+
+    if (!documentId) {
+      return res.status(400).json({ error: 'Document ID is required' });
+    }
+
+    // Verify document belongs to the user
+    try {
+      await verifyDocumentOwnership(documentId, req.user.userId);
+
+      // Clear chat history
+      await prisma.documents.update({
+        where: { id: parseInt(documentId) },
+        data: {
+          chatHistory: [],
+          updatedAt: new Date()
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        documentId,
+        message: 'Chat history cleared successfully'
+      });
+    } catch (error: any) {
+      return res.status(404).json({ error: error.message });
+    }
+  } catch (error: any) {
+    console.error('Clear document chat history error:', error);
+    return res.status(500).json({
+      error: 'Failed to clear document chat history',
+      details: error.message
+    });
+  }
+};
