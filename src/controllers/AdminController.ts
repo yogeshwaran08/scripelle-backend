@@ -376,6 +376,25 @@ export async function getBetaAccessList(req: Request, res: Response) {
     }
 }
 
+export async function getUserAccessList(req: Request, res: Response) {
+    try {
+        const users = await prisma.user.findMany({
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        return res.status(200).json({
+            message: 'User list retrieved successfully',
+            count: users.length,
+            data: users
+        });
+    } catch (error) {
+        console.error('Get user list error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
 /**
  * Reject a user from the waiting list (admin-only)
  * POST /api/admin/beta/reject/:userId
