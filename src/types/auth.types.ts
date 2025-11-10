@@ -8,6 +8,9 @@ export interface User {
   lastName: string;
   plan: string;
   availableCredits: number;
+  isAdmin: boolean;
+  betaMember: boolean;
+  status: 'pending' | 'approved' | 'rejected';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +22,8 @@ export interface UserResponse {
   lastName: string;
   plan: string;
   availableCredits: number;
+  betaMember?: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
   createdAt: Date;
 }
 
@@ -44,9 +49,27 @@ export interface ResetPasswordRequest {
   newPassword: string;
 }
 
+export interface AddBetaEmailRequest {
+  email: string;
+}
+
+export interface CreateAdminRequest {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  adminSecret?: string; // Optional secret key for creating admin
+}
+
+export interface AdminLoginRequest {
+  email: string;
+  password: string;
+}
+
 export interface TokenPayload {
   userId: number;
   email: string;
+  isAdmin?: boolean;
 }
 
 export interface RefreshTokenPayload {

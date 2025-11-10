@@ -14,7 +14,9 @@ import {
   LoginRequest,
   AuthRequest,
   ForgotPasswordRequest,
-  ResetPasswordRequest
+  ResetPasswordRequest,
+  CreateAdminRequest,
+  AdminLoginRequest
 } from '../types/auth.types';
 import { catchAsync } from '../utils/httpWrapper';
 import { EmailService } from '../services/email.service';
@@ -43,6 +45,11 @@ export async function register(req: Request<{}, {}, RegisterRequest>, res: Respo
       return;
     }
 
+    const betaAccess = await prisma.betaAccessList.findUnique({
+      where: { email }
+    });
+
+    const isBetaApproved = betaAccess?.approved || false;
     const hashedPassword = await hashPassword(password);
 
     const newUser = await prisma.user.create({
@@ -51,9 +58,26 @@ export async function register(req: Request<{}, {}, RegisterRequest>, res: Respo
         password: hashedPassword,
         firstName,
         lastName,
-        plan: 'free'
+        plan: 'free',
+        betaMember: isBetaApproved,
+        status: isBetaApproved ? 'approved' : 'pending'
       }
     });
+
+    if (!isBetaApproved) {
+      return res.status(201).json({
+        message: "You're added to the waiting list. We'll notify you when approved.",
+        waitingList: true,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          status: newUser.status,
+          betaMember: newUser.betaMember
+        }
+      });
+    }
 
     const { accessToken, refreshToken } = generateTokens(newUser.id, newUser.email);
 
@@ -74,6 +98,8 @@ export async function register(req: Request<{}, {}, RegisterRequest>, res: Respo
         lastName: newUser.lastName,
         plan: newUser.plan,
         availableCredits: newUser.availableCredits,
+        betaMember: newUser.betaMember,
+        status: newUser.status,
         createdAt: newUser.createdAt,
       },
     });
@@ -109,6 +135,25 @@ export async function login(req: Request<{}, {}, LoginRequest>, res: Response): 
       return;
     }
 
+    // Check if user is on waiting list
+    if (user.status === 'pending' && !user.betaMember) {
+      res.status(403).json({
+        error: "Your account is pending approval. You're on the waiting list. We'll notify you when approved.",
+        waitingList: true,
+        status: user.status
+      });
+      return;
+    }
+
+    // Check if user is rejected
+    if (user.status === 'rejected') {
+      res.status(403).json({
+        error: 'Your beta access request has been rejected.',
+        status: user.status
+      });
+      return;
+    }
+
     const { accessToken, refreshToken } = generateTokens(user.id, user.email);
 
     res.cookie('refreshToken', refreshToken, {
@@ -129,6 +174,8 @@ export async function login(req: Request<{}, {}, LoginRequest>, res: Response): 
         lastName: user.lastName,
         plan: user.plan,
         availableCredits: user.availableCredits,
+        betaMember: user.betaMember,
+        status: user.status,
         createdAt: user.createdAt,
       },
     });
@@ -416,6 +463,163 @@ export async function resetPassword(req: Request<{}, {}, ResetPasswordRequest>, 
     });
   } catch (error) {
     console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
+ * Create admin user
+ * POST /auth/admin/create
+ */
+export async function createAdmin(req: Request<{}, {}, CreateAdminRequest>, res: Response) {
+  try {
+    const { email, password, firstName, lastName, adminSecret } = req.body;
+
+    // Validate required fields
+    if (!email || !password || !firstName || !lastName) {
+      return res.status(400).json({ error: 'Email, password, firstName, and lastName are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Optional: Validate admin secret key (add to .env as ADMIN_SECRET_KEY)
+    const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY;
+    if (ADMIN_SECRET_KEY && adminSecret !== ADMIN_SECRET_KEY) {
+      return res.status(403).json({ error: 'Invalid admin secret key' });
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ error: 'User with this email already exists' });
+    }
+
+    const hashedPassword = await hashPassword(password);
+
+    // Create admin user with approved beta status
+    const newAdmin = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        plan: 'free',
+        isAdmin: true,
+        betaMember: true,
+        status: 'approved'
+      }
+    });
+
+    // Also add to beta access list
+    await prisma.betaAccessList.create({
+      data: {
+        email,
+        approved: true,
+        addedBy: 'system'
+      }
+    }).catch(() => {
+      // Ignore if already exists
+    });
+
+    const { accessToken, refreshToken } = generateTokens(newAdmin.id, newAdmin.email);
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(201).json({
+      message: 'Admin user created successfully',
+      accessToken,
+      user: {
+        id: newAdmin.id,
+        email: newAdmin.email,
+        firstName: newAdmin.firstName,
+        lastName: newAdmin.lastName,
+        plan: newAdmin.plan,
+        isAdmin: newAdmin.isAdmin,
+        availableCredits: newAdmin.availableCredits,
+        betaMember: newAdmin.betaMember,
+        status: newAdmin.status,
+        createdAt: newAdmin.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('Create admin error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
+ * Admin login
+ * POST /auth/admin/login
+ */
+export async function adminLogin(req: Request<{}, {}, AdminLoginRequest>, res: Response): Promise<void> {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email and password are required' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+
+    // Verify user is an admin
+    if (!user.isAdmin) {
+      res.status(403).json({ error: 'Access denied. Admin privileges required.' });
+      return;
+    }
+
+    const isPasswordValid = await comparePassword(password, user.password || "");
+
+    if (!isPasswordValid) {
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user.id, user.email);
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Return access token and user info
+    res.status(200).json({
+      message: 'Admin login successful',
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        plan: user.plan,
+        isAdmin: user.isAdmin,
+        availableCredits: user.availableCredits,
+        betaMember: user.betaMember,
+        status: user.status,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

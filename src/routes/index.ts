@@ -4,6 +4,7 @@ import authRoutes from "./auth.routes";
 import AIRoutes from "./ai.routes";
 import documentRoutes from "./document.routes";
 import autocompletionRoutes from "./autocompletion.routes";
+import adminRoutes from "./admin.routes";
 
 const AppRoot = Router();
 
@@ -13,6 +14,7 @@ AppRoot.use("/auth", authRoutes);
 AppRoot.use("/ai/", AIRoutes);
 AppRoot.use("/documents", documentRoutes);
 AppRoot.use("/autocompletion", autocompletionRoutes);
+AppRoot.use("/admin", adminRoutes);
 
 
 export default AppRoot;

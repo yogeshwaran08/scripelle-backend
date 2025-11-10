@@ -9,6 +9,8 @@ import {
   googleCallbackHandler,
   forgotPassword,
   resetPassword,
+  createAdmin,
+  adminLogin,
 } from '../controllers/Authentication';
 import { authenticateToken } from '../middlewares/auth.middleware';
 import passport from '../utils/passport';
@@ -21,6 +23,10 @@ router.post('/refresh', refreshToken);
 router.post('/logout', logout);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
+
+// Admin routes
+router.post('/admin/create', createAdmin);
+router.post('/admin/login', adminLogin);
 
 router.get(
   "/google",
