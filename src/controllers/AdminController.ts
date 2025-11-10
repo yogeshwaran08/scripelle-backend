@@ -4,6 +4,130 @@ import { AuthRequest, AddBetaEmailRequest } from '../types/auth.types';
 import { EmailService } from '../services/email.service';
 
 /**
+ * Add multiple emails to the beta access list (admin-only)
+ * POST /api/admin/beta/add-multiple
+ */
+export async function addMultipleBetaEmails(req: Request<{}, {}, { emails: string[] }>, res: Response) {
+    try {
+        const { emails } = req.body;
+        const adminUser = (req as AuthRequest).user;
+
+        if (!emails || !Array.isArray(emails) || emails.length === 0) {
+            return res.status(400).json({ error: 'Emails array is required and must not be empty' });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const invalidEmails = emails.filter(email => !emailRegex.test(email));
+        
+        if (invalidEmails.length > 0) {
+            return res.status(400).json({ 
+                error: 'Invalid email format',
+                invalidEmails 
+            });
+        }
+
+        const results = {
+            added: [] as any[],
+            updated: [] as any[],
+            autoApproved: [] as any[],
+            errors: [] as any[]
+        };
+
+        // Process each email
+        for (const email of emails) {
+            try {
+                // Check if email already exists in beta access list
+                const existingBetaEmail = await prisma.betaAccessList.findUnique({
+                    where: { email }
+                });
+
+                if (existingBetaEmail) {
+                    // Update to approved if it exists
+                    const updatedBetaEmail = await prisma.betaAccessList.update({
+                        where: { email },
+                        data: {
+                            approved: true,
+                            addedBy: adminUser?.userId?.toString() || 'admin'
+                        }
+                    });
+
+                    results.updated.push({
+                        id: updatedBetaEmail.id,
+                        email: updatedBetaEmail.email,
+                        approved: updatedBetaEmail.approved
+                    });
+                } else {
+                    // Create new beta access entry
+                    const betaEmail = await prisma.betaAccessList.create({
+                        data: {
+                            email,
+                            approved: true,
+                            addedBy: adminUser?.userId?.toString() || 'admin'
+                        }
+                    });
+
+                    results.added.push({
+                        id: betaEmail.id,
+                        email: betaEmail.email,
+                        approved: betaEmail.approved
+                    });
+                }
+
+                // Check if user already exists with this email
+                const existingUser = await prisma.user.findUnique({
+                    where: { email }
+                });
+
+                // If user exists and is pending, auto-approve them
+                if (existingUser && existingUser.status === 'pending') {
+                    await prisma.user.update({
+                        where: { id: existingUser.id },
+                        data: {
+                            betaMember: true,
+                            status: 'approved'
+                        }
+                    });
+
+                    results.autoApproved.push({
+                        userId: existingUser.id,
+                        email: existingUser.email
+                    });
+
+                    // Optional: Send approval notification email
+                    try {
+                        // await EmailService.sendBetaApprovalEmail(email);
+                    } catch (emailError) {
+                        console.error(`Error sending approval email to ${email}:`, emailError);
+                    }
+                }
+            } catch (emailError) {
+                console.error(`Error processing email ${email}:`, emailError);
+                results.errors.push({
+                    email,
+                    error: emailError instanceof Error ? emailError.message : 'Unknown error'
+                });
+            }
+        }
+
+        return res.status(201).json({
+            message: 'Bulk email operation completed',
+            summary: {
+                totalProcessed: emails.length,
+                added: results.added.length,
+                updated: results.updated.length,
+                autoApproved: results.autoApproved.length,
+                errors: results.errors.length
+            },
+            data: results
+        });
+    } catch (error) {
+        console.error('Add multiple beta emails error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+/**
  * Add an email to the beta access list (admin-only)
  * POST /api/admin/beta/add
  */
