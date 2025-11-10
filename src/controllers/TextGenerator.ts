@@ -2,6 +2,7 @@ import { NextFunction, Response } from "express";
 import { AuthRequest } from "../types/auth.types";
 import { genAI } from "../initializers";
 import prisma from "../db/prisma";
+import { humanizeText } from "../utils/humanize.utils";
 
 async function verifyDocumentOwnership(documentId: string, userId: number) {
   const document = await prisma.documents.findUnique({
@@ -107,7 +108,6 @@ export const generateText = async (req: AuthRequest, res: Response, next: NextFu
       fullPrompt += `Context: ${context}\n`;
     }
 
-    // Add document title as context if available and meaningful
     if (document && document.title &&
       document.title.trim() !== '' &&
       document.title.toLowerCase() !== 'untitled document' &&
@@ -336,10 +336,6 @@ export const getDocumentChatHistory = async (req: AuthRequest, res: Response, ne
   }
 };
 
-/**
- * Clear document chat history - requires authentication and document ownership
- * DELETE /ai/document-chat-history/:documentId
- */
 export const clearDocumentChatHistory = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
@@ -352,11 +348,9 @@ export const clearDocumentChatHistory = async (req: AuthRequest, res: Response, 
       return res.status(400).json({ error: 'Document ID is required' });
     }
 
-    // Verify document belongs to the user
     try {
       await verifyDocumentOwnership(documentId, req.user.userId);
 
-      // Clear chat history
       await prisma.documents.update({
         where: { id: parseInt(documentId) },
         data: {
@@ -377,6 +371,100 @@ export const clearDocumentChatHistory = async (req: AuthRequest, res: Response, 
     console.error('Clear document chat history error:', error);
     return res.status(500).json({
       error: 'Failed to clear document chat history',
+      details: error.message
+    });
+  }
+};
+
+export const humanizeAIText = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const {
+      text,
+      model = "undetectable",
+      words = true,
+      costs = true,
+      language = "English"
+    } = req.body;
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ 
+        error: 'Text is required and must be a string' 
+      });
+    }
+
+    if (text.trim().length === 0) {
+      return res.status(400).json({ 
+        error: 'Text cannot be empty' 
+      });
+    }
+
+    if (text.length > 10000) {
+      return res.status(400).json({ 
+        error: 'Text is too long. Maximum 10,000 characters allowed' 
+      });
+    }
+
+    const apiKey = process.env.REPHRASY_API_KEY;
+    
+    if (!apiKey) {
+      console.error('REPHRASY_API_KEY not found in environment variables');
+      return res.status(500).json({ 
+        error: 'Humanization service is not configured. Please contact administrator.' 
+      });
+    }
+
+    const result = await humanizeText(text, apiKey, {
+      model,
+      words,
+      costs,
+      language
+    });
+
+    if (result.error) {
+      return res.status(400).json({
+        success: false,
+        error: result.error,
+        message: result.message
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      humanized_text: result.humanized_text,
+      credits_used: result.credits_used,
+      cost: result.cost,
+      model,
+      language,
+      userId: req.user.userId
+    });
+
+  } catch (error: any) {
+    console.error('Humanize text error:', error);
+
+    if (error.message?.includes('HTTP error! status: 401')) {
+      return res.status(401).json({
+        error: 'Invalid API key for humanization service'
+      });
+    }
+
+    if (error.message?.includes('HTTP error! status: 429')) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded. Please try again later.'
+      });
+    }
+
+    if (error.message?.includes('HTTP error! status: 402')) {
+      return res.status(402).json({
+        error: 'Insufficient credits for humanization service'
+      });
+    }
+
+    return res.status(500).json({
+      error: 'Failed to humanize text',
       details: error.message
     });
   }
