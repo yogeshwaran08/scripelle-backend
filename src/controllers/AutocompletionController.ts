@@ -3,9 +3,7 @@ import { generateContent } from '../services/gemini.service';
 import { AutocompletionRequest, AutocompletionResponse, SuggestionItem } from '../types/autocompletion.types';
 import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Get autocompletion suggestions using Gemini AI
- */
+
 export const getAutocompletionSuggestions = async (req: Request, res: Response) => {
   const startTime = Date.now();
 
@@ -19,7 +17,6 @@ export const getAutocompletionSuggestions = async (req: Request, res: Response) 
       strategy = 'ai'
     }: AutocompletionRequest = req.body;
 
-    // Validation
     if (!text || typeof text !== 'string') {
       return res.status(400).json({
         success: false,

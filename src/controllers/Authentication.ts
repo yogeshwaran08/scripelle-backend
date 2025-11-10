@@ -135,17 +135,16 @@ export async function login(req: Request<{}, {}, LoginRequest>, res: Response): 
       return;
     }
 
-    // Check if user is on waiting list
     if (user.status === 'pending' && !user.betaMember) {
       res.status(403).json({
         error: "Your account is pending approval. You're on the waiting list. We'll notify you when approved.",
         waitingList: true,
-        status: user.status
+        status: user.status,
+        message: 'pending'
       });
       return;
     }
 
-    // Check if user is rejected
     if (user.status === 'rejected') {
       res.status(403).json({
         error: 'Your beta access request has been rejected.',
