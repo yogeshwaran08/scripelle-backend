@@ -4,32 +4,7 @@ import { optionalAuthentication } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-/**
- * POST /autocompletion/suggestions
- * Get autocompletion suggestions for text input
- * 
- * Body:
- * {
- *   "text": "The quick brown fox",
- *   "cursorPosition": 15,
- *   "context": "Writing an email about project updates",
- *   "documentType": "email",
- *   "maxSuggestions": 5,
- *   "strategy": "hybrid"
- * }
- */
 router.post('/suggestions', optionalAuthentication, getAutocompletionSuggestions);
-
-/**
- * POST /autocompletion/predict
- * Simple text prediction endpoint
- * 
- * Body:
- * {
- *   "text": "The quick brown fox",
- *   "context": "optional context"
- * }
- */
 router.post('/predict', optionalAuthentication, async (req, res) => {
     try {
         const { text, context } = req.body;

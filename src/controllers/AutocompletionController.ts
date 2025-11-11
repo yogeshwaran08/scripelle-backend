@@ -366,23 +366,43 @@ function createDefaultSuggestions(): SuggestionItem[] {
  */
 export const predictNextText = async (inputText: string, context?: string): Promise<string> => {
   try {
-    const prompt = `Continue this text naturally: "${inputText}"${context ? `\nContext: ${context}` : ''}
+    const textAnalysis = analyzeTextForPrediction(inputText);
     
-Provide a natural continuation (1-10 words) that flows well with the existing text. Respond with only the continuation text, no explanations.`;
+    const prompt = `You are an advanced text completion AI assistant. Analyze the following text and provide the most natural and contextually appropriate continuation.
 
-    // Generate content using Gemini
-    const prediction = await generateContent(prompt, 'gemini-1.5-flash');
-    return prediction.trim();
+INPUT TEXT: "${inputText}"${context ? `\nADDITIONAL CONTEXT: ${context}` : ''}
+
+TEXT ANALYSIS:
+- Last sentence: "${textAnalysis.lastSentence}"
+- Writing style: ${textAnalysis.style}
+- Likely completing: ${textAnalysis.completionType}
+
+INSTRUCTIONS:
+1. Provide ONLY the next logical continuation (2-12 words)
+2. Match the writing style and tone of the input
+3. Ensure grammatical correctness and natural flow
+4. If the text appears incomplete (ending with "the", "a", "an", etc.), complete the phrase
+5. If it's mid-sentence, continue the thought naturally
+6. If it ends with punctuation, start a new related sentence
+7. DO NOT repeat the input text
+8. DO NOT add explanations or quotes
+9. Respond with ONLY the continuation text
+
+CONTINUATION:`;
+
+    const prediction = await generateContent(prompt, 'gemini-2.0-flash-exp');
+    
+    const cleanedPrediction = cleanPrediction(prediction, inputText);
+    
+    return cleanedPrediction;
   } catch (error: any) {
     console.error('Error predicting next text:', error.message);
 
-    // Handle quota exceeded or other errors with fallback
     if (error.status === 429 || error.message?.includes('quota')) {
-      return generateSimpleFallback(inputText);
+      return generateAdvancedFallback(inputText, context);
     }
 
-    // For other errors, return a generic fallback
-    return generateSimpleFallback(inputText);
+    return generateAdvancedFallback(inputText, context);
   }
 };
 
@@ -412,4 +432,183 @@ function generateSimpleFallback(text: string): string {
   // If no specific completion, return common connectors
   const connectors = ['and', 'but', 'so', 'that', 'with', 'for'];
   return connectors[Math.floor(Math.random() * connectors.length)];
+}
+
+/**
+ * Analyze text to understand context for better predictions
+ */
+function analyzeTextForPrediction(text: string): {
+  lastSentence: string;
+  style: string;
+  completionType: string;
+} {
+  const trimmedText = text.trim();
+  const sentences = trimmedText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const lastSentence = sentences[sentences.length - 1]?.trim() || trimmedText;
+  const words = trimmedText.split(/\s+/);
+  const lastWord = words[words.length - 1]?.toLowerCase() || '';
+  
+  // Detect writing style
+  let style = 'casual';
+  if (trimmedText.includes('Dear') || trimmedText.includes('Sincerely') || trimmedText.includes('regards')) {
+    style = 'formal/professional';
+  } else if (trimmedText.includes('Additionally') || trimmedText.includes('Furthermore') || trimmedText.includes('Moreover')) {
+    style = 'academic/formal';
+  } else if (trimmedText.match(/[!]{2,}/) || trimmedText.match(/[?]{2,}/)) {
+    style = 'informal/excited';
+  }
+  
+  // Detect completion type
+  let completionType = 'sentence continuation';
+  const incompleteTriggers = ['the', 'a', 'an', 'this', 'that', 'these', 'those', 'my', 'your', 'his', 'her', 'their', 'our'];
+  
+  if (incompleteTriggers.includes(lastWord)) {
+    completionType = 'phrase/noun completion';
+  } else if (lastSentence.match(/\b(what|where|when|why|how|who)\b/i)) {
+    completionType = 'question completion';
+  } else if (lastWord.match(/[,;:]$/)) {
+    completionType = 'list or clause continuation';
+  } else if (lastWord.match(/[.!?]$/)) {
+    completionType = 'new sentence';
+  } else if (lastWord.match(/^(is|are|was|were|will|would|could|should|can|may|might)$/i)) {
+    completionType = 'predicate completion';
+  }
+  
+  return {
+    lastSentence: lastSentence.substring(Math.max(0, lastSentence.length - 100)),
+    style,
+    completionType
+  };
+}
+
+/**
+ * Clean and validate AI prediction
+ */
+function cleanPrediction(prediction: string, originalText: string): string {
+  let cleaned = prediction.trim();
+  
+  // Remove common AI artifacts
+  cleaned = cleaned.replace(/^["']|["']$/g, ''); // Remove quotes
+  cleaned = cleaned.replace(/^CONTINUATION:\s*/i, ''); // Remove labels
+  cleaned = cleaned.replace(/^Here's?\s+(the|a)\s+continuation:?\s*/i, '');
+  cleaned = cleaned.replace(/^The\s+continuation\s+is:?\s*/i, '');
+  
+  // Remove any text that repeats the original input
+  const lastWords = originalText.trim().split(/\s+/).slice(-5).join(' ').toLowerCase();
+  if (cleaned.toLowerCase().startsWith(lastWords)) {
+    cleaned = cleaned.substring(lastWords.length).trim();
+  }
+  
+  // Ensure it doesn't start with punctuation (except valid cases)
+  if (cleaned.match(/^[,;:]/) && !originalText.trim().endsWith(' ')) {
+    cleaned = ' ' + cleaned;
+  }
+  
+  // Limit length to reasonable completion
+  const words = cleaned.split(/\s+/);
+  if (words.length > 15) {
+    cleaned = words.slice(0, 15).join(' ');
+    // Add ellipsis if we cut off mid-sentence
+    if (!cleaned.match(/[.!?]$/)) {
+      cleaned += '...';
+    }
+  }
+  
+  return cleaned;
+}
+
+/**
+ * Generate advanced fallback with better context awareness
+ */
+function generateAdvancedFallback(text: string, context?: string): string {
+  const trimmedText = text.trim();
+  const words = trimmedText.split(/\s+/);
+  const lastWord = words[words.length - 1]?.toLowerCase() || '';
+  const lastTwoWords = words.slice(-2).join(' ').toLowerCase();
+  const lastSentence = trimmedText.split(/[.!?]/).pop()?.trim() || '';
+  
+  // Enhanced rule-based completions with multi-word patterns
+  const advancedCompletions: { [key: string]: string[] } = {
+    // Articles
+    'the': ['best way to', 'most important', 'main reason', 'next step', 'following information'],
+    'a': ['new approach', 'better solution', 'great opportunity', 'simple way', 'good idea'],
+    'an': ['important aspect', 'interesting perspective', 'excellent example', 'effective method', 'ideal solution'],
+    
+    // Pronouns
+    'i': ['believe that', 'think we should', 'would like to', 'am confident that', 'hope to'],
+    'we': ['need to', 'should consider', 'can achieve', 'will work on', 'are planning to'],
+    'you': ['can see that', 'should know', 'might want to', 'will find', 'may notice'],
+    'it': ['is important to', 'will help', 'can be', 'should be', 'has been'],
+    
+    // Prepositions and conjunctions
+    'in': ['order to', 'the future', 'this case', 'my opinion', 'recent years'],
+    'on': ['the other hand', 'this topic', 'behalf of', 'schedule', 'time'],
+    'at': ['the same time', 'this point', 'the moment', 'least', 'first'],
+    'to': ['be honest', 'make sure', 'achieve this', 'clarify', 'summarize'],
+    
+    // Common verbs
+    'is': ['important to note', 'essential that', 'clear that', 'necessary to', 'worth mentioning'],
+    'are': ['working on', 'looking forward to', 'pleased to', 'committed to', 'ready to'],
+    'will': ['be able to', 'help you', 'continue to', 'provide', 'ensure that'],
+    'can': ['help you', 'be found', 'see that', 'provide', 'ensure'],
+    'have': ['been working on', 'the opportunity to', 'noticed that', 'completed', 'received'],
+    
+    // Time and sequence
+    'then': ['we can', 'it will', 'you should', 'the next step is', 'proceed with'],
+    'now': ['we can', 'it is', 'let\'s', 'you should', 'that we'],
+    'next': ['step is to', 'we will', 'time', 'few days', 'week'],
+    'first': ['of all', 'we need to', 'let me', 'thing to consider', 'step is'],
+  };
+  
+  // Check two-word patterns first
+  const twoWordPatterns: { [key: string]: string[] } = {
+    'looking forward': ['to hearing from you', 'to working with', 'to the meeting', 'to your response'],
+    'thank you': ['for your time', 'for your consideration', 'for reaching out', 'for your help'],
+    'i would': ['like to', 'appreciate', 'be happy to', 'recommend'],
+    'we are': ['pleased to', 'working on', 'excited to', 'committed to'],
+    'this is': ['a great opportunity', 'important because', 'why we', 'how we'],
+    'that is': ['why we', 'how we', 'the reason', 'what makes'],
+    'in order': ['to achieve', 'to ensure', 'to provide', 'to complete'],
+  };
+  
+  // Try two-word patterns first
+  if (twoWordPatterns[lastTwoWords]) {
+    const options = twoWordPatterns[lastTwoWords];
+    return options[Math.floor(Math.random() * options.length)];
+  }
+  
+  // Try single-word patterns
+  if (advancedCompletions[lastWord]) {
+    const options = advancedCompletions[lastWord];
+    return options[Math.floor(Math.random() * options.length)];
+  }
+  
+  // Context-aware completions
+  if (context) {
+    if (context.toLowerCase().includes('email') || lastSentence.toLowerCase().includes('dear')) {
+      return ['I hope this message finds you well', 'Thank you for your time', 'I look forward to hearing from you'][Math.floor(Math.random() * 3)];
+    }
+    if (context.toLowerCase().includes('question')) {
+      return ['would be', 'should we', 'do you think'][Math.floor(Math.random() * 3)];
+    }
+  }
+  
+  // Sentence-ending detection
+  if (lastWord.match(/[.!?]$/)) {
+    const starters = ['Additionally,', 'Furthermore,', 'Moreover,', 'However,', 'Therefore,', 'In conclusion,'];
+    return starters[Math.floor(Math.random() * starters.length)];
+  }
+  
+  // Question detection
+  if (lastSentence.match(/\b(what|where|when|why|how|who)\b/i)) {
+    return ['would you', 'do you think', 'can we', 'should we'][Math.floor(Math.random() * 4)];
+  }
+  
+  // Default smart connectors with better context
+  const smartConnectors = [
+    'and', 'that', 'to', 'for', 'with', 'in', 
+    'which', 'because', 'so that', 'as well as'
+  ];
+  
+  return smartConnectors[Math.floor(Math.random() * smartConnectors.length)];
 }

@@ -296,10 +296,6 @@ function detectContentGenerationIntent(prompt: string): boolean {
   return false;
 }
 
-/**
- * Get document chat history - requires authentication and document ownership
- * GET /ai/document-chat-history/:documentId
- */
 export const getDocumentChatHistory = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
@@ -312,7 +308,6 @@ export const getDocumentChatHistory = async (req: AuthRequest, res: Response, ne
       return res.status(400).json({ error: 'Document ID is required' });
     }
 
-    // Verify document belongs to the user
     try {
       const document = await verifyDocumentOwnership(documentId, req.user.userId);
 
