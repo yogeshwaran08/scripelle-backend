@@ -33,8 +33,6 @@ export const getAutocompletionSuggestions = async (req: Request, res: Response) 
       });
     }
 
-    // Generate suggestions using Gemini AI
-    console.log('Generating text predictions for:', text.substring(0, 50) + '...');
     const suggestions = await generateTextPredictions(
       text,
       cursorPosition,
@@ -49,7 +47,7 @@ export const getAutocompletionSuggestions = async (req: Request, res: Response) 
       suggestions,
       strategy: strategy || 'ai',
       processingTime,
-      hasMore: false // For now, we return all suggestions at once
+      hasMore: false 
     };
 
     res.json({
@@ -76,9 +74,6 @@ export const getAutocompletionSuggestions = async (req: Request, res: Response) 
   }
 };
 
-/**
- * Generate text predictions using Gemini AI
- */
 async function generateTextPredictions(
   text: string,
   cursorPosition: number,
@@ -88,21 +83,17 @@ async function generateTextPredictions(
 ): Promise<SuggestionItem[]> {
   try {
     console.log('Starting text prediction generation...');
-    // Split text at cursor position
     const beforeCursor = text.substring(0, cursorPosition);
     const afterCursor = text.substring(cursorPosition);
 
-    // Create context-aware prompt for Gemini
     console.log('Creating prompt...');
     const prompt = createAutocompletionPrompt(beforeCursor, afterCursor, context, documentType, maxSuggestions);
     console.log('Prompt created, length:', prompt.length);
 
-    // Generate content using Gemini
     console.log('Calling Gemini API...');
     const geminiResponse = await generateContent(prompt, 'gemini-1.5-flash');
     console.log('Gemini response received, length:', geminiResponse.length);
 
-    // Parse and format the response into suggestions
     console.log('Parsing response...');
     const suggestions = parseGeminiResponse(geminiResponse, maxSuggestions);
     console.log('Generated suggestions count:', suggestions.length);
@@ -111,21 +102,17 @@ async function generateTextPredictions(
   } catch (error: any) {
     console.error('Error generating text predictions:', error.message);
 
-    // Handle quota exceeded gracefully
     if (error.status === 429 || error.message?.includes('quota')) {
       console.log('Quota exceeded, returning fallback suggestions');
       return createQuotaExceededSuggestions(text.substring(0, cursorPosition));
     }
 
-    // For other errors, return fallback suggestions
     console.log('API error, returning fallback suggestions');
     return createDefaultSuggestions();
   }
 }
 
-/**
- * Create a well-structured prompt for Gemini AI
- */
+
 function createAutocompletionPrompt(
   beforeCursor: string,
   afterCursor: string,
@@ -170,9 +157,6 @@ Example format:
 Respond ONLY with the JSON array, no additional text or explanations.`;
 }
 
-/**
- * Get document type specific instructions
- */
 function getDocumentTypeInstructions(documentType: string): string {
   switch (documentType) {
     case 'email':
@@ -187,16 +171,11 @@ function getDocumentTypeInstructions(documentType: string): string {
   }
 }
 
-/**
- * Parse Gemini response and convert to SuggestionItem array
- */
 function parseGeminiResponse(geminiResponse: string, maxSuggestions: number): SuggestionItem[] {
   try {
-    // Try to parse as JSON first
     let parsedResponse: any[];
 
     try {
-      // Clean the response - remove any markdown formatting
       const cleanedResponse = geminiResponse
         .replace(/```json\n?/g, '')
         .replace(/```\n?/g, '')
@@ -204,12 +183,10 @@ function parseGeminiResponse(geminiResponse: string, maxSuggestions: number): Su
 
       parsedResponse = JSON.parse(cleanedResponse);
     } catch (parseError) {
-      // If JSON parsing fails, create fallback suggestions
       console.warn('Failed to parse Gemini JSON response, creating fallback suggestions');
       return createFallbackSuggestions(geminiResponse, maxSuggestions);
     }
 
-    // Validate and format the parsed response
     if (!Array.isArray(parsedResponse)) {
       throw new Error('Response is not an array');
     }
@@ -234,9 +211,6 @@ function parseGeminiResponse(geminiResponse: string, maxSuggestions: number): Su
   }
 }
 
-/**
- * Validate suggestion type
- */
 function validateSuggestionType(type: string): 'completion' | 'continuation' | 'replacement' {
   const validTypes = ['completion', 'continuation', 'replacement'];
   return validTypes.includes(type) ? type as any : 'continuation';
@@ -481,34 +455,27 @@ function analyzeTextForPrediction(text: string): {
   };
 }
 
-/**
- * Clean and validate AI prediction
- */
+
 function cleanPrediction(prediction: string, originalText: string): string {
   let cleaned = prediction.trim();
   
-  // Remove common AI artifacts
-  cleaned = cleaned.replace(/^["']|["']$/g, ''); // Remove quotes
-  cleaned = cleaned.replace(/^CONTINUATION:\s*/i, ''); // Remove labels
+  cleaned = cleaned.replace(/^["']|["']$/g, ''); 
+  cleaned = cleaned.replace(/^CONTINUATION:\s*/i, ''); 
   cleaned = cleaned.replace(/^Here's?\s+(the|a)\s+continuation:?\s*/i, '');
   cleaned = cleaned.replace(/^The\s+continuation\s+is:?\s*/i, '');
   
-  // Remove any text that repeats the original input
   const lastWords = originalText.trim().split(/\s+/).slice(-5).join(' ').toLowerCase();
   if (cleaned.toLowerCase().startsWith(lastWords)) {
     cleaned = cleaned.substring(lastWords.length).trim();
   }
   
-  // Ensure it doesn't start with punctuation (except valid cases)
   if (cleaned.match(/^[,;:]/) && !originalText.trim().endsWith(' ')) {
     cleaned = ' ' + cleaned;
   }
   
-  // Limit length to reasonable completion
   const words = cleaned.split(/\s+/);
   if (words.length > 15) {
     cleaned = words.slice(0, 15).join(' ');
-    // Add ellipsis if we cut off mid-sentence
     if (!cleaned.match(/[.!?]$/)) {
       cleaned += '...';
     }
@@ -517,9 +484,7 @@ function cleanPrediction(prediction: string, originalText: string): string {
   return cleaned;
 }
 
-/**
- * Generate advanced fallback with better context awareness
- */
+
 function generateAdvancedFallback(text: string, context?: string): string {
   const trimmedText = text.trim();
   const words = trimmedText.split(/\s+/);
@@ -527,40 +492,33 @@ function generateAdvancedFallback(text: string, context?: string): string {
   const lastTwoWords = words.slice(-2).join(' ').toLowerCase();
   const lastSentence = trimmedText.split(/[.!?]/).pop()?.trim() || '';
   
-  // Enhanced rule-based completions with multi-word patterns
   const advancedCompletions: { [key: string]: string[] } = {
-    // Articles
     'the': ['best way to', 'most important', 'main reason', 'next step', 'following information'],
     'a': ['new approach', 'better solution', 'great opportunity', 'simple way', 'good idea'],
     'an': ['important aspect', 'interesting perspective', 'excellent example', 'effective method', 'ideal solution'],
     
-    // Pronouns
     'i': ['believe that', 'think we should', 'would like to', 'am confident that', 'hope to'],
     'we': ['need to', 'should consider', 'can achieve', 'will work on', 'are planning to'],
     'you': ['can see that', 'should know', 'might want to', 'will find', 'may notice'],
     'it': ['is important to', 'will help', 'can be', 'should be', 'has been'],
     
-    // Prepositions and conjunctions
     'in': ['order to', 'the future', 'this case', 'my opinion', 'recent years'],
     'on': ['the other hand', 'this topic', 'behalf of', 'schedule', 'time'],
     'at': ['the same time', 'this point', 'the moment', 'least', 'first'],
     'to': ['be honest', 'make sure', 'achieve this', 'clarify', 'summarize'],
     
-    // Common verbs
     'is': ['important to note', 'essential that', 'clear that', 'necessary to', 'worth mentioning'],
     'are': ['working on', 'looking forward to', 'pleased to', 'committed to', 'ready to'],
     'will': ['be able to', 'help you', 'continue to', 'provide', 'ensure that'],
     'can': ['help you', 'be found', 'see that', 'provide', 'ensure'],
     'have': ['been working on', 'the opportunity to', 'noticed that', 'completed', 'received'],
     
-    // Time and sequence
     'then': ['we can', 'it will', 'you should', 'the next step is', 'proceed with'],
     'now': ['we can', 'it is', 'let\'s', 'you should', 'that we'],
     'next': ['step is to', 'we will', 'time', 'few days', 'week'],
     'first': ['of all', 'we need to', 'let me', 'thing to consider', 'step is'],
   };
   
-  // Check two-word patterns first
   const twoWordPatterns: { [key: string]: string[] } = {
     'looking forward': ['to hearing from you', 'to working with', 'to the meeting', 'to your response'],
     'thank you': ['for your time', 'for your consideration', 'for reaching out', 'for your help'],
@@ -571,19 +529,16 @@ function generateAdvancedFallback(text: string, context?: string): string {
     'in order': ['to achieve', 'to ensure', 'to provide', 'to complete'],
   };
   
-  // Try two-word patterns first
   if (twoWordPatterns[lastTwoWords]) {
     const options = twoWordPatterns[lastTwoWords];
     return options[Math.floor(Math.random() * options.length)];
   }
   
-  // Try single-word patterns
   if (advancedCompletions[lastWord]) {
     const options = advancedCompletions[lastWord];
     return options[Math.floor(Math.random() * options.length)];
   }
   
-  // Context-aware completions
   if (context) {
     if (context.toLowerCase().includes('email') || lastSentence.toLowerCase().includes('dear')) {
       return ['I hope this message finds you well', 'Thank you for your time', 'I look forward to hearing from you'][Math.floor(Math.random() * 3)];
@@ -593,18 +548,15 @@ function generateAdvancedFallback(text: string, context?: string): string {
     }
   }
   
-  // Sentence-ending detection
   if (lastWord.match(/[.!?]$/)) {
     const starters = ['Additionally,', 'Furthermore,', 'Moreover,', 'However,', 'Therefore,', 'In conclusion,'];
     return starters[Math.floor(Math.random() * starters.length)];
   }
   
-  // Question detection
   if (lastSentence.match(/\b(what|where|when|why|how|who)\b/i)) {
     return ['would you', 'do you think', 'can we', 'should we'][Math.floor(Math.random() * 4)];
   }
   
-  // Default smart connectors with better context
   const smartConnectors = [
     'and', 'that', 'to', 'for', 'with', 'in', 
     'which', 'because', 'so that', 'as well as'

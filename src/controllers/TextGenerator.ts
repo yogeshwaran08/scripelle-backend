@@ -168,7 +168,6 @@ export const generateText = async (req: AuthRequest, res: Response, next: NextFu
       }
     }
 
-    // If document was provided, update its chat history
     let chatHistoryLength = null;
     if (document) {
       const updatedChatHistory = await updateDocumentChatHistory(
